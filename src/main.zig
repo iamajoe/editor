@@ -37,6 +37,7 @@ pub fn main() !void {
             .file_data = null,
             .selected_row = 0,
             .selected_col = 0,
+            .line_number_cols = 6,
             .show_line_numbers = true,
             .is_line_number_relative = true,
         },
@@ -137,4 +138,9 @@ fn render(app: *App) !bool {
     try app.renderer.render();
 
     return false;
+}
+
+test {
+    _ = EditorView;
+    _ = Renderer;
 }
