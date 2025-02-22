@@ -1,0 +1,24 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Main",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/zig-out/bin/editor",
+      "preLaunchTask": "build",
+      "MIMode": "lldb",
+      "cwd": "${workspaceFolder}",
+      "targetArchitecture": "arm64"
+    },
+    {
+      "name": "Debug Test",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/zig-out/bin/${fileBasenameNoExtension}-test",
+      "preLaunchTask": "build-test",
+      "MIMode": "lldb",
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}

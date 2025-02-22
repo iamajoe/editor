@@ -37,4 +37,14 @@ pub fn build(b: *std.Build) void {
 
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_exe_unit_tests.step);
+
+    // run tests under lldb for possible debugger
+    const lldb = b.addSystemCommand(&.{
+        "lldb",
+        // add lldb flags before --
+        "--",
+    });
+    lldb.addArtifactArg(exe_unit_tests);
+    const lldb_step = b.step("debug", "run the tests under lldb");
+    lldb_step.dependOn(&lldb.step);
 }

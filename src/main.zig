@@ -1,16 +1,58 @@
 const std = @import("std");
 const vaxis = @import("vaxis");
+const EditorView = @import("./editor_view.zig");
 const Renderer = @import("./renderer.zig");
 
+const max_fps = 30;
+const frame_time_ms = @divFloor(1000, max_fps);
 const max_file_buffer_size = 50000;
 
 const App = struct {
     allocator: std.mem.Allocator,
     renderer: Renderer,
 
-    open_file_path: ?[]u8,
-    open_file_lines: ?std.ArrayList([]const u8),
+    is_running: bool,
+
+    editor_view: EditorView,
 };
+
+pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer {
+        _ = gpa.detectLeaks();
+        _ = gpa.deinit();
+    }
+    var arena = std.heap.ArenaAllocator.init(gpa.allocator());
+    defer arena.deinit();
+    const alloc = arena.allocator();
+
+    // create the app
+    var app: App = .{
+        .allocator = alloc,
+        .renderer = try Renderer.init(alloc),
+        .is_running = false,
+
+        .editor_view = .{
+            .file_data = null,
+            .selected_row = 0,
+            .selected_col = 0,
+        },
+    };
+    defer app.renderer.deinit();
+
+    // read the file into lines
+    // TODO: should inform of error
+    const open_file_path = try std.fs.path.join(alloc, &[_][]const u8{
+        try std.fs.cwd().realpathAlloc(alloc, "."),
+        "src/main.zig",
+    });
+    const open_file_lines = try readFile(alloc, open_file_path);
+    // TODO: should inform of error reading the file
+    app.editor_view.setFileData(open_file_lines);
+
+    // go through the main app loop
+    try startLoop(&app);
+}
 
 fn readFile(
     allocator: std.mem.Allocator,
@@ -33,53 +75,63 @@ fn readFile(
     return file_data;
 }
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer {
-        _ = gpa.detectLeaks();
-        _ = gpa.deinit();
-    }
-    var arena = std.heap.ArenaAllocator.init(gpa.allocator());
-    defer arena.deinit();
-    const alloc = arena.allocator();
-
-    // create the app
-    var app: App = .{
-        .allocator = alloc,
-        .renderer = try Renderer.init(alloc),
-
-        .open_file_path = null,
-        .open_file_lines = null,
-    };
-    defer app.renderer.deinit();
-
-    // read the file into lines
-    // TODO: should inform of error
-    app.open_file_path = try std.fs.path.join(alloc, &[_][]const u8{
-        try std.fs.cwd().realpathAlloc(alloc, "."),
-        "src/main.zig",
-    });
-    if (app.open_file_path) |file_path| {
-        app.open_file_lines = try readFile(alloc, file_path);
-        // TODO: should inform of error
-    }
-
-    // go through the main app loop
+fn startLoop(app: *App) !void {
+    app.is_running = true;
     try app.renderer.startLoop();
-    while (true) {
-        const eventFound = try app.renderer.waitForEvent();
-        switch (eventFound) {
+
+    var last_time = std.time.milliTimestamp();
+
+    while (app.is_running) {
+        var shouldBreak = try update(app);
+        if (shouldBreak) {
+            app.is_running = false;
+            return;
+        }
+
+        // we want to limit the rendering to the maximum frames per second
+        const current_time = std.time.milliTimestamp();
+        const elapsed = (current_time - last_time);
+        if (elapsed >= frame_time_ms) {
+            shouldBreak = try render(app);
+            if (shouldBreak) {
+                app.is_running = false;
+                return;
+            }
+
+            // cache time for next step
+            last_time = current_time;
+        }
+    }
+}
+
+fn update(app: *App) !bool {
+    // handle event if we have one
+    const eventFound = try app.renderer.tryEvent();
+    if (eventFound) |event| {
+        switch (event) {
             .key_press => |key| {
                 if (key.matches('c', .{ .ctrl = true })) {
-                    return;
+                    return true;
                 }
 
-                // TODO: what else?!
+                // TODO: handle actions
             },
             else => {},
         }
-
-        // render the screen
-        try app.renderer.render();
     }
+
+    app.editor_view.update();
+
+    return false;
+}
+
+fn render(app: *App) !bool {
+    const win = app.renderer.prepareRender();
+
+    app.editor_view.render(win);
+
+    // render the actual screen
+    try app.renderer.render();
+
+    return false;
 }

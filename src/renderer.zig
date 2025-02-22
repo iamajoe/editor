@@ -43,39 +43,32 @@ pub fn startLoop(self: *Renderer) !void {
     try self.loop.start();
 }
 
-pub fn waitForEvent(self: *Renderer) !RenderEvent {
-    // nextEvent blocks until an event is in the queue
-    const event = self.loop.nextEvent();
-
+pub fn tryEvent(self: *Renderer) !?RenderEvent {
     // handle the events
-    switch (event) {
-        .winsize => |ws| {
-            try self.vx.resize(self.allocator, self.tty.anyWriter(), ws);
-            return event;
-        },
-        else => {
-            return event;
-        },
+    const eventFound = self.loop.tryEvent();
+    if (eventFound) |event| {
+        switch (event) {
+            .winsize => |ws| {
+                try self.vx.resize(self.allocator, self.tty.anyWriter(), ws);
+                return event;
+            },
+            else => {},
+        }
+
+        return event;
     }
+
+    return null;
 }
 
-pub fn render(self: *Renderer) !void {
+pub fn prepareRender(self: *Renderer) vaxis.Window {
     // prepare the window for rendering
     const win = self.vx.window();
     win.clear();
 
-    // render some text on the screen
-    var scroll_view: vaxis.widgets.ScrollView = .{};
-    scroll_view.writeCell(win, 0, 0, .{
-        .char = .{ .grapheme = "Foo", .width = 0 },
-        .style = vaxis.Style{},
-    });
+    return win;
+}
 
-    scroll_view.writeCell(win, win.width - 20, 10, .{
-        .char = .{ .grapheme = "Foo", .width = 0 },
-        .style = vaxis.Style{},
-    });
-
-    // render the screen
+pub fn render(self: *Renderer) !void {
     try self.vx.render(self.tty.anyWriter());
 }
