@@ -33,9 +33,12 @@ pub fn main() !void {
         .is_running = false,
 
         .editor_view = .{
+            .allocator = alloc,
             .file_data = null,
             .selected_row = 0,
             .selected_col = 0,
+            .show_line_numbers = true,
+            .is_line_number_relative = true,
         },
     };
     defer app.renderer.deinit();
@@ -48,7 +51,7 @@ pub fn main() !void {
     });
     const open_file_lines = try readFile(alloc, open_file_path);
     // TODO: should inform of error reading the file
-    app.editor_view.setFileData(open_file_lines);
+    try app.editor_view.setFileData(open_file_lines);
 
     // go through the main app loop
     try startLoop(&app);
@@ -128,7 +131,7 @@ fn update(app: *App) !bool {
 fn render(app: *App) !bool {
     const win = app.renderer.prepareRender();
 
-    app.editor_view.render(win);
+    try app.editor_view.render(win);
 
     // render the actual screen
     try app.renderer.render();
