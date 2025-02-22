@@ -3,14 +3,17 @@ const vaxis = @import("vaxis");
 const number = @import("./number.zig");
 
 const EditorView = @This();
-const line_blank = " ";
-const line_number_pad_to_code = 2;
 
+// configs
+line_blank: []const u8,
+line_number_pad_to_code: usize,
+show_line_numbers: bool,
+is_line_number_relative: bool,
+
+// to be used internally
 allocator: std.mem.Allocator,
 selected_row: usize,
 selected_col: usize,
-show_line_numbers: bool,
-is_line_number_relative: bool,
 line_number_cols: usize,
 file_data: ?std.ArrayList([]const u8),
 
@@ -66,7 +69,7 @@ fn renderLineNumbers(
 
     // iterate each column and add the number
     for (0..self.line_number_cols) |i| {
-        var char: []const u8 = line_blank;
+        var char: []const u8 = self.line_blank;
         if (i >= diff) {
             const digit = number.extractDigitFromLeft(curr_num, digit_index);
             char = number.digitToStr(digit);
@@ -86,10 +89,10 @@ fn renderLineNumbers(
     }
 
     // set extra padding for the code
-    for (0..line_number_pad_to_code) |i| {
+    for (0..self.line_number_pad_to_code) |i| {
         _ = i;
         win.writeCell(curr_pos, row, .{
-            .char = .{ .grapheme = line_blank, .width = 1 },
+            .char = .{ .grapheme = self.line_blank, .width = 1 },
             .style = number_style,
         });
         curr_pos += 1;
@@ -129,7 +132,7 @@ fn renderLine(
         while (curr_pos < win.width) {
             win.writeCell(curr_pos, row, .{
                 .char = .{
-                    .grapheme = line_blank,
+                    .grapheme = self.line_blank,
                     .width = 1,
                 },
                 .style = line_style,

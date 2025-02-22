@@ -33,13 +33,18 @@ pub fn main() !void {
         .is_running = false,
 
         .editor_view = .{
-            .allocator = alloc,
-            .file_data = null,
-            .selected_row = 0,
-            .selected_col = 0,
-            .line_number_cols = 6,
+            // configs
+            .line_blank = " ",
+            .line_number_pad_to_code = 2,
             .show_line_numbers = true,
             .is_line_number_relative = true,
+
+            // to be used internally
+            .allocator = alloc,
+            .file_data = null,
+            .selected_row = undefined,
+            .selected_col = undefined,
+            .line_number_cols = undefined,
         },
     };
     defer app.renderer.deinit();
