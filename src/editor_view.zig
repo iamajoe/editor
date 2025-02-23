@@ -182,7 +182,7 @@ fn renderLine(
         if (line.len - 1 > cursor_x) {
             const after_cursor = line[cursor_x + 1 ..];
             win.writeCell(curr_pos, row, .{
-                .char = .{ .grapheme = after_cursor, .width = line.len },
+                .char = .{ .grapheme = after_cursor, .width = after_cursor.len },
                 .wrapped = false,
                 .style = line_style,
             });
