@@ -12,7 +12,6 @@ tty: vaxis.Tty,
 vx: vaxis.Vaxis,
 loop: vaxis.Loop(RenderEvent),
 
-// REF: https://github.com/rockorager/libvaxis/blob/main/src/vxfw/App.zig
 pub fn init(alloc: std.mem.Allocator) !Renderer {
     var tty = try vaxis.Tty.init();
     var vx = try vaxis.init(alloc, .{});

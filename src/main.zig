@@ -1,18 +1,17 @@
 const std = @import("std");
 const vaxis = @import("vaxis");
 const vfxw = @import("vaxis/vxfw");
-const buffer = @import("./buffer.zig");
+const Buffer = @import("./buffer.zig");
 const keymanager = @import("./keymanager.zig");
 const welcome_view = @import("./welcome_view.zig");
 const EditorView = @import("./editor_view.zig");
 const Renderer = @import("./renderer.zig");
 
-const render_frame_time_ms = @divFloor(1000, 30);
-const update_frame_time_ms = @divFloor(1000, 60);
-const max_file_buffer_size = 50000;
+const render_frame_time_ms = @divFloor(1000, 60);
+const update_frame_time_ms = @divFloor(1000, 120);
 
 pub const App = struct {
-    buffer_allocator: std.heap.ArenaAllocator,
+    buffer_allocator: std.mem.Allocator,
 
     renderer: Renderer,
     editor_view: ?*EditorView,
@@ -21,23 +20,25 @@ pub const App = struct {
 };
 
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer {
-        _ = gpa.detectLeaks();
-        _ = gpa.deinit();
-    }
+    // handle renderer
+    var render_allocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer render_allocator.deinit();
+    var renderer = try Renderer.init(render_allocator.allocator());
+    defer renderer.deinit();
+
+    // handle buffer
+    var buffer_allocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer buffer_allocator.deinit();
 
     // create the app view
     var app: App = .{
-        .buffer_allocator = std.heap.ArenaAllocator.init(gpa.allocator()),
+        .buffer_allocator = buffer_allocator.allocator(),
 
-        .renderer = try Renderer.init(gpa.allocator()),
+        .renderer = renderer,
         .editor_view = null,
 
         .is_running = false,
     };
-    defer app.buffer_allocator.deinit();
-    defer app.renderer.deinit();
 
     // go through the main app loop
     try startLoop(&app);
@@ -56,8 +57,7 @@ fn startLoop(app: *App) !void {
         // we want to limit the updates
         var elapsed = (current_time - update_last_time);
         if (elapsed >= update_frame_time_ms) {
-            const shouldBreak = try update(app);
-            if (shouldBreak) {
+            if (try update(app)) {
                 app.is_running = false;
                 return;
             }
@@ -69,8 +69,7 @@ fn startLoop(app: *App) !void {
         // we want to limit the rendering
         elapsed = (current_time - render_last_time);
         if (elapsed >= render_frame_time_ms) {
-            const shouldBreak = try render(app);
-            if (shouldBreak) {
+            if (try render(app)) {
                 app.is_running = false;
                 return;
             }
@@ -85,52 +84,61 @@ pub fn openFile(app: *App) !void {
     app.editor_view = null;
 
     // clear the old allocator first
+    // TODO: how to reset the allocator?
     // _ = app.buffer_allocator.reset(.retain_capacity);
-    const alloc = app.buffer_allocator.allocator();
+    const alloc = app.buffer_allocator;
 
     // TODO: setup a file picker
-    // read the file into lines
+    // read the file
     // TODO: should inform of error
-    const open_file_path = try std.fs.path.join(alloc, &[_][]const u8{
-        try std.fs.cwd().realpathAlloc(alloc, "."),
-        "src/main.zig",
-    });
-    // _ = open_file_path;
-    // TODO: should inform of error reading the file
-    const open_file_lines = try buffer.readFile(alloc, open_file_path);
-    _ = open_file_lines;
+    const open_file_path = try std.fs.cwd().realpathAlloc(
+        alloc,
+        // "./src/fixtures/case-md.md",
+        "./src/renderer.zig",
+    );
+    const buffer = try alloc.create(Buffer);
+    buffer.* = Buffer{
+        .allocator = alloc,
+        .line_count = 0,
+        .file_path = null,
+        .data = null,
+        .data_lines = null,
+    };
+    try buffer.read(open_file_path);
 
     // create the editor view
     const editor_view = try alloc.create(EditorView);
-    _ = editor_view;
-    // editor_view.* = EditorView{
-    //     // configs
-    //     .line_blank = " ",
-    //     .show_line_numbers = true,
-    //     .is_line_number_relative = true,
-    //
-    //     // theme
-    //     .theme_number_right_pad = 2,
-    //     .theme_number = vaxis.Style{ .dim = true },
-    //     .theme_number_selected = vaxis.Style{
-    //         .bg = .{ .rgb = [_]u8{ 50, 50, 50 } },
-    //     },
-    //     .theme_code_base = vaxis.Style{},
-    //     .theme_code_base_selected = vaxis.Style{
-    //         .bg = .{ .rgb = [_]u8{ 50, 50, 50 } },
-    //     },
-    //
-    //     // to be used internally
-    //     .cursor_x = undefined,
-    //     .cursor_y = undefined,
-    //     .line_count = undefined,
-    //     .line_number_cols = undefined,
-    //     .file_data = null,
-    // };
+    editor_view.* = EditorView{
+        .buffer = buffer,
 
-    // // TODO: should catch and inform
-    // try editor_view.setFileData(open_file_lines);
-    // app.editor_view = editor_view;
+        // configs
+        .line_blank = " ",
+        .show_line_numbers = true,
+        .is_line_number_relative = true,
+
+        // theme
+        .theme_number_left_pad = 2,
+        .theme_number_right_pad = 2,
+        .theme_number = vaxis.Style{ .dim = true },
+        .theme_number_selected = vaxis.Style{
+            .bg = .{ .rgb = [_]u8{ 50, 50, 50 } },
+        },
+        .theme_code_left_pad = 1,
+        .theme_code_base = vaxis.Style{},
+        .theme_code_base_selected = vaxis.Style{
+            .bg = .{ .rgb = [_]u8{ 50, 50, 50 } },
+        },
+
+        // to be used internally
+        .allocator = alloc,
+        .win_width = 0,
+        .win_height = 0,
+        .cursor_x = 0,
+        .cursor_y = 0,
+    };
+
+    // TODO: should catch and inform
+    app.editor_view = editor_view;
 }
 
 fn update(app: *App) !bool {
@@ -149,9 +157,9 @@ fn update(app: *App) !bool {
     }
 
     // update the editor
-    // if (app.editor_view) |editor_view| {
-    //     editor_view.update();
-    // }
+    if (app.editor_view) |editor_view| {
+        editor_view.update();
+    }
 
     return false;
 }
@@ -161,8 +169,8 @@ fn render(app: *App) !bool {
 
     if (app.editor_view) |editor_view| {
         try editor_view.render(win);
-        // } else {
-        //     welcome_view.render(win);
+    } else {
+        welcome_view.render(win);
     }
 
     // render the actual screen
@@ -172,7 +180,9 @@ fn render(app: *App) !bool {
 }
 
 test {
-    _ = buffer;
+    _ = Buffer;
+    _ = keymanager;
+    _ = welcome_view;
     _ = EditorView;
     _ = Renderer;
 }

@@ -63,6 +63,11 @@ const ascii_sub: [ascii_sub_height][]const u8 = .{
 };
 
 pub fn render(win: vaxis.Window) void {
+    // make sure we have a window
+    if (win.height <= 0 or win.width <= 0) {
+        return;
+    }
+
     const offset_y = win.height / 2 - ascii_height / 2 - initial_offset_y;
 
     // render the title
