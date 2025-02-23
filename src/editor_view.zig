@@ -18,6 +18,7 @@ theme_number_selected: vaxis.Style,
 theme_code_left_pad: usize,
 theme_code_base: vaxis.Style,
 theme_code_base_selected: vaxis.Style,
+theme_code_base_cursor: vaxis.Style,
 
 // to be used internally
 allocator: std.mem.Allocator,
@@ -128,6 +129,7 @@ fn renderLine(
         line_style = self.theme_code_base_selected;
     }
 
+    // TODO: maybe we should think in terms of gaps and leave all of this
     // figure the left pad
     var left_pad = self.theme_code_left_pad;
     if (self.show_line_numbers) {
@@ -148,15 +150,55 @@ fn renderLine(
         curr_pos += 1;
     }
 
+    if (is_selected_row and line.len > 0) {
+        // we don't want to go out of bounds
+        var cursor_x = self.cursor_x;
+        if (cursor_x > line.len - 1) {
+            cursor_x = line.len - 1;
+        }
+
+        // being selected, we want to figure where the cursor is on x,
+        // for that, we need to split it into 3
+        // before the cursor, the cursor and the after cursor
+
+        if (cursor_x > 0) {
+            const before_cursor = line[0..cursor_x];
+            win.writeCell(curr_pos, row, .{
+                .char = .{ .grapheme = before_cursor, .width = before_cursor.len },
+                .wrapped = false,
+                .style = line_style,
+            });
+            curr_pos += before_cursor.len;
+        }
+
+        const cursor = line[cursor_x .. cursor_x + 1];
+        win.writeCell(curr_pos, row, .{
+            .char = .{ .grapheme = cursor, .width = 1 },
+            .wrapped = false,
+            .style = self.theme_code_base_cursor,
+        });
+        curr_pos += 1;
+
+        if (line.len - 1 > cursor_x) {
+            const after_cursor = line[cursor_x + 1 ..];
+            win.writeCell(curr_pos, row, .{
+                .char = .{ .grapheme = after_cursor, .width = line.len },
+                .wrapped = false,
+                .style = line_style,
+            });
+            curr_pos += after_cursor.len;
+        }
+    } else if (line.len > 0) {
+        win.writeCell(curr_pos, row, .{
+            .char = .{ .grapheme = line, .width = line.len },
+            .wrapped = false,
+            .style = line_style,
+        });
+        curr_pos += line.len;
+    }
+
     // TODO: when actually building the syntax coloring,
     //       we will need to extend instead of assign
-
-    win.writeCell(curr_pos, row, .{
-        .char = .{ .grapheme = line, .width = line.len },
-        .wrapped = false,
-        .style = line_style,
-    });
-    curr_pos += line.len;
 
     // render the remaining row
     while (curr_pos < win.width) {
@@ -206,19 +248,44 @@ pub fn render(self: *EditorView, win: vaxis.Window) !void {
 }
 
 pub fn moveCursorX(self: *EditorView, offset: usize, isLeft: bool) void {
+    // this must be an error but for now, just reset the cursor
+    if (self.buffer == null or self.buffer.?.data_lines == null) {
+        self.cursor_x = 0;
+        return;
+    }
+
     if (isLeft) {
         self.cursor_x -|= offset;
     } else {
         self.cursor_x +|= offset;
     }
 
-    // you can't select over the last line
-    if (self.cursor_x > self.win_width) {
-        self.cursor_x = self.win_width;
+    const lines = self.buffer.?.data_lines.?;
+
+    // this must be an error but for now, just reset the cursor
+    if (lines.items.len - 1 < self.cursor_y) {
+        self.cursor_x = 0;
+        return;
+    }
+
+    const line = lines.items[self.cursor_y];
+
+    // we need characters in line to perform anything
+    if (line.len == 0) {
+        return;
+    }
+
+    // only let select until the last character
+    if (self.cursor_x > line.len - 1) {
+        self.cursor_x = line.len - 1;
     }
 }
 
 pub fn moveCursorY(self: *EditorView, offset: usize, isUp: bool) void {
+    if (self.buffer == null) {
+        return;
+    }
+
     if (isUp) {
         self.cursor_y -|= offset;
     } else {

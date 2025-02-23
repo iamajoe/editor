@@ -128,6 +128,9 @@ pub fn openFile(app: *App) !void {
         .theme_code_base_selected = vaxis.Style{
             .bg = .{ .rgb = [_]u8{ 50, 50, 50 } },
         },
+        .theme_code_base_cursor = vaxis.Style{
+            .bg = .{ .rgb = [_]u8{ 75, 75, 75 } },
+        },
 
         // to be used internally
         .allocator = alloc,

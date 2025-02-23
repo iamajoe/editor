@@ -25,7 +25,7 @@ pub fn handleKey(app: *main.App, key: vaxis.Key) !bool {
         } else if (key.matches('h', .{})) {
             editor_view.moveCursorX(1, true);
         } else if (key.matches('l', .{})) {
-            editor_view.moveCursorY(1, false);
+            editor_view.moveCursorX(1, false);
         }
     }
 
