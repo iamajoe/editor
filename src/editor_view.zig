@@ -77,6 +77,10 @@ pub fn init(alloc: std.mem.Allocator, buffer: *Buffer) !*EditorView {
     return editor_view;
 }
 
+pub fn deinit(self: *EditorView) void {
+    self.buffer.deinit();
+}
+
 pub fn update(self: *EditorView) void {
     _ = self;
     // NOTE: nothing to do for now...

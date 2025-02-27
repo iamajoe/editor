@@ -50,6 +50,10 @@ pub fn main() !void {
 
     // go through the main app loop
     try startLoop(&app);
+
+    if (app.editor_view) |editor_view| {
+        editor_view.deinit();
+    }
 }
 
 fn startLoop(app: *App) !void {

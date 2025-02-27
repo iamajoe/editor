@@ -8,6 +8,7 @@ line_count: usize,
 syntax: ?[]u8,
 file_path: ?[]u8,
 data: ?[]u8,
+data_tree: ?*tree_sitter.Tree,
 data_lines: ?std.ArrayList(Line),
 
 pub const Line = struct {
@@ -24,10 +25,17 @@ pub fn init(alloc: std.mem.Allocator) !*Buffer {
         .syntax = null,
         .file_path = null,
         .data = null,
+        .data_tree = null,
         .data_lines = null,
     };
 
     return buffer;
+}
+
+pub fn deinit(self: *Buffer) void {
+    if (self.data_tree) |tree| {
+        tree.destroy();
+    }
 }
 
 pub fn read(self: *Buffer, file_path: []u8) !void {
@@ -67,6 +75,8 @@ pub fn read(self: *Buffer, file_path: []u8) !void {
     self.line_count = file_line_data.items.len;
     self.syntax = @constCast(std.fs.path.extension(file_path));
 
+    // TODO: handle syntax special cases like Makefile
+
     // TODO: we should do tree sitter but async
     //       we need to do it on every single change
     // TODO: this doesn't do much, we want it to test
@@ -75,7 +85,7 @@ pub fn read(self: *Buffer, file_path: []u8) !void {
     //       maybe that should be within tree sitter
     // TODO: should be able to set the syntax manually
     if (self.syntax) |syntax| {
-        try tree_sitter.parseCode(file_data, syntax);
+        self.data_tree = try tree_sitter.parseCode(file_data, syntax);
     }
 }
 
