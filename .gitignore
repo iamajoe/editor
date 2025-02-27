@@ -1,2 +1,26 @@
+# Logs
+logs
+*.log
+
+dist
+*.local
+
+# Editor directories and files
+.vim/*
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+tmp*
+.env
+
 .zig-cache
 zig-*
+.tmp
+.d

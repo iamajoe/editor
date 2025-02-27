@@ -1,12 +1,34 @@
 const std = @import("std");
+const tree_sitter = @import("./tree_sitter.zig");
 
 const Buffer = @This();
 
 allocator: std.mem.Allocator,
 line_count: usize,
+syntax: ?[]u8,
 file_path: ?[]u8,
 data: ?[]u8,
-data_lines: ?std.ArrayList([]u8),
+data_lines: ?std.ArrayList(Line),
+
+pub const Line = struct {
+    data: []u8,
+    len: usize,
+    number: usize,
+};
+
+pub fn init(alloc: std.mem.Allocator) !*Buffer {
+    const buffer = try alloc.create(Buffer);
+    buffer.* = Buffer{
+        .allocator = alloc,
+        .line_count = 0,
+        .syntax = null,
+        .file_path = null,
+        .data = null,
+        .data_lines = null,
+    };
+
+    return buffer;
+}
 
 pub fn read(self: *Buffer, file_path: []u8) !void {
     const max_size = std.math.maxInt(usize);
@@ -17,21 +39,44 @@ pub fn read(self: *Buffer, file_path: []u8) !void {
     );
 
     // separate into lines
-    var file_line_data = std.ArrayList([]u8).init(self.allocator);
+    var file_line_data = std.ArrayList(Line).init(self.allocator);
     var start_new_line: usize = 0;
     for (file_data, 0..) |byte, i| {
-        if (byte == '\n') {
-            // NOTE: we dont +1 because we don't want the newline byte
-            try file_line_data.append(file_data[start_new_line..i]);
-            start_new_line = i + 1;
+        if (byte != '\n') {
+            continue;
         }
+
+        // NOTE: we dont +1 because we don't want the newline byte
+        const line_raw = file_data[start_new_line..i];
+        try file_line_data.append(Line{
+            .data = line_raw,
+            .len = line_raw.len,
+            .number = file_line_data.items.len,
+        });
+        start_new_line = i + 1;
     }
+
+    // TODO: we should dupe so we have the original since later we need to save
+    // TODO: we should probably have transformation changes so we can re-enact
+    //       later (undo, redo)
 
     // cache values
     self.file_path = file_path;
     self.data = file_data;
     self.data_lines = file_line_data;
     self.line_count = file_line_data.items.len;
+    self.syntax = @constCast(std.fs.path.extension(file_path));
+
+    // TODO: we should do tree sitter but async
+    //       we need to do it on every single change
+    // TODO: this doesn't do much, we want it to test
+    // TODO: need to actually get the syntax out of the file
+    //       maybe a map for each file extension we can think of
+    //       maybe that should be within tree sitter
+    // TODO: should be able to set the syntax manually
+    if (self.syntax) |syntax| {
+        try tree_sitter.parseCode(file_data, syntax);
+    }
 }
 
 test "read" {

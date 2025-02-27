@@ -10,10 +10,10 @@ pub fn handleKey(app: *main.App, key: vaxis.Key) !bool {
         return true;
     }
 
-    if (key.matches('o', .{ .ctrl = true })) {
-        try main.openFile(app);
-        return false;
-    }
+    // if (key.matches('o', .{ .ctrl = true })) {
+    //     try main.openFile(app);
+    //     return false;
+    // }
 
     // if we have an editor view, it means we have a file active
     if (app.editor_view) |editor_view| {

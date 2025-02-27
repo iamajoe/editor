@@ -23,8 +23,6 @@ pub fn main() !void {
     // handle renderer
     var render_allocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer render_allocator.deinit();
-    var renderer = try Renderer.init(render_allocator.allocator());
-    defer renderer.deinit();
 
     // handle buffer
     var buffer_allocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -34,11 +32,21 @@ pub fn main() !void {
     var app: App = .{
         .buffer_allocator = buffer_allocator.allocator(),
 
-        .renderer = renderer,
+        // .renderer = undefined,
+        .renderer = try Renderer.init(render_allocator.allocator()),
         .editor_view = null,
 
         .is_running = false,
     };
+    defer app.renderer.deinit();
+
+    // find the argument for the file to open
+    const args = try std.process.argsAlloc(buffer_allocator.allocator());
+    for (args, 0..) |arg, i| {
+        if (i == 1) {
+            try openFile(&app, arg);
+        }
+    }
 
     // go through the main app loop
     try startLoop(&app);
@@ -80,7 +88,7 @@ fn startLoop(app: *App) !void {
     }
 }
 
-pub fn openFile(app: *App) !void {
+pub fn openFile(app: *App, file_path: []u8) !void {
     app.editor_view = null;
 
     // clear the old allocator first
@@ -94,54 +102,14 @@ pub fn openFile(app: *App) !void {
     const open_file_path = try std.fs.cwd().realpathAlloc(
         alloc,
         // "./src/fixtures/case-md.md",
-        "./src/renderer.zig",
+        // "./src/renderer.zig",
+        file_path, // TODO: handle absolutes
     );
-    const buffer = try alloc.create(Buffer);
-    buffer.* = Buffer{
-        .allocator = alloc,
-        .line_count = 0,
-        .file_path = null,
-        .data = null,
-        .data_lines = null,
-    };
+    const buffer = try Buffer.init(alloc);
     try buffer.read(open_file_path);
 
-    // create the editor view
-    const editor_view = try alloc.create(EditorView);
-    editor_view.* = EditorView{
-        .buffer = buffer,
-
-        // configs
-        .line_blank = " ",
-        .show_line_numbers = true,
-        .is_line_number_relative = true,
-
-        // theme
-        .theme_number_left_pad = 2,
-        .theme_number_right_pad = 2,
-        .theme_number = vaxis.Style{ .dim = true },
-        .theme_number_selected = vaxis.Style{
-            .bg = .{ .rgb = [_]u8{ 50, 50, 50 } },
-        },
-        .theme_code_left_pad = 1,
-        .theme_code_base = vaxis.Style{},
-        .theme_code_base_selected = vaxis.Style{
-            .bg = .{ .rgb = [_]u8{ 50, 50, 50 } },
-        },
-        .theme_code_base_cursor = vaxis.Style{
-            .bg = .{ .rgb = [_]u8{ 75, 75, 75 } },
-        },
-
-        // to be used internally
-        .allocator = alloc,
-        .win_width = 0,
-        .win_height = 0,
-        .cursor_x = 0,
-        .cursor_y = 0,
-    };
-
     // TODO: should catch and inform
-    app.editor_view = editor_view;
+    app.editor_view = try EditorView.init(alloc, buffer);
 }
 
 fn update(app: *App) !bool {
