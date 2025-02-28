@@ -49,7 +49,7 @@ pub fn main() !void {
     }
 
     // go through the main app loop
-    try startLoop(&app);
+    // try startLoop(&app);
 
     if (app.editor_view) |editor_view| {
         editor_view.deinit();
@@ -143,7 +143,8 @@ fn render(app: *App) !bool {
     const win = app.renderer.prepareRender();
 
     if (app.editor_view) |editor_view| {
-        try editor_view.render(win);
+        _ = editor_view;
+        // try editor_view.render(win);
     } else {
         welcome_view.render(win);
     }

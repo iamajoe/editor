@@ -19,6 +19,11 @@ pub fn build(b: *std.Build) void {
     const tree_sitter = b.dependency("tree-sitter", .{ .target = target, .optimize = optimize });
     exe.root_module.addImport("tree-sitter", tree_sitter.module("tree-sitter"));
 
+    // dependencies: treesitter javascript grammar
+    const ts_javascript = b.dependency("tree_sitter_javascript", .{});
+    exe.addCSourceFile(.{ .file = ts_javascript.path("src/parser.c") });
+    exe.addCSourceFile(.{ .file = ts_javascript.path("src/scanner.c") });
+
     // dependencies: treesitter zig grammar
     const ts_zig = b.dependency("tree_sitter_zig", .{});
     exe.addCSourceFile(.{ .file = ts_zig.path("src/parser.c") });

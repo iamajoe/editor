@@ -85,7 +85,10 @@ pub fn read(self: *Buffer, file_path: []u8) !void {
     //       maybe that should be within tree sitter
     // TODO: should be able to set the syntax manually
     if (self.syntax) |syntax| {
-        self.data_tree = try tree_sitter.parseCode(file_data, syntax);
+        const tree = try tree_sitter.parseCode(file_data, syntax);
+        try tree_sitter.getHighlight(self.allocator, tree, syntax);
+
+        self.data_tree = tree;
     }
 }
 
