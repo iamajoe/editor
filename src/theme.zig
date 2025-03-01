@@ -1,5 +1,6 @@
 const std = @import("std");
 const vaxis = @import("vaxis");
+const tree_sitter = @import("./tree_sitter.zig");
 const debug = @import("./debug.zig");
 
 const color_catppuccin = struct {
@@ -42,87 +43,24 @@ const theme_cursor: vaxis.Style = .{
     .bg = .{ .rgb = [_]u8{ 85, 85, 85 } },
 };
 
-const TSTokenType = enum {
-    none, // means it hasn't found one
-
-    comment,
-    identifier,
-    integer,
-    operator, // +, -, /, *, =
-    string,
-    symbol, // ;, ,, :, (, ), {, }
-
-    struct_keyword,
-    var_keyword, // const, var, let...
-    macro,
-    function, // function, fn, fun
-};
-const kind_to_token_map: [33]std.meta.Tuple(&.{
-    []const u8,
-    TSTokenType,
-}) = .{
-    .{ "comment", TSTokenType.comment },
-    .{ "identifier", TSTokenType.identifier },
-    .{ "property_identifier", TSTokenType.identifier },
-    .{ "shorthand_property_identifier_pattern", TSTokenType.identifier },
-    .{ "number", TSTokenType.integer },
-    .{ "integer", TSTokenType.integer },
-    .{ "+", TSTokenType.operator },
-    .{ "-", TSTokenType.operator },
-    .{ "/", TSTokenType.operator },
-    .{ "*", TSTokenType.operator },
-    .{ "=", TSTokenType.operator },
-    .{ "string", TSTokenType.string },
-    .{ "template_string", TSTokenType.string },
-    .{ ";", TSTokenType.symbol },
-    .{ ",", TSTokenType.symbol },
-    .{ ":", TSTokenType.symbol },
-    .{ ".", TSTokenType.symbol },
-    .{ "(", TSTokenType.symbol },
-    .{ ")", TSTokenType.symbol },
-    .{ "{", TSTokenType.symbol },
-    .{ "}", TSTokenType.symbol },
-    .{ "[", TSTokenType.symbol },
-    .{ "]", TSTokenType.symbol },
-    .{ "struct", TSTokenType.struct_keyword },
-    .{ "enum", TSTokenType.struct_keyword },
-    .{ "macro", TSTokenType.macro },
-    .{ "builtin_type", TSTokenType.macro },
-    .{ "var", TSTokenType.var_keyword },
-    .{ "let", TSTokenType.var_keyword },
-    .{ "const", TSTokenType.var_keyword },
-    .{ "function", TSTokenType.function },
-    .{ "fn", TSTokenType.function },
-    .{ "fun", TSTokenType.function },
-};
 const token_to_color_map: [11]std.meta.Tuple(&.{
-    TSTokenType,
+    tree_sitter.TSTokenType,
     [3]u8,
 }) = .{
-    .{ TSTokenType.none, color_base },
-    .{ TSTokenType.comment, color_base },
-    .{ TSTokenType.identifier, color_catppuccin.text },
-    .{ TSTokenType.integer, color_catppuccin.peach },
-    .{ TSTokenType.operator, color_catppuccin.teal },
-    .{ TSTokenType.string, color_catppuccin.green },
-    .{ TSTokenType.symbol, color_base },
-    .{ TSTokenType.struct_keyword, color_catppuccin.mauve },
-    .{ TSTokenType.macro, color_catppuccin.yellow },
-    .{ TSTokenType.var_keyword, color_catppuccin.mauve },
-    .{ TSTokenType.function, color_catppuccin.mauve },
+    .{ tree_sitter.TSTokenType.none, color_base },
+    .{ tree_sitter.TSTokenType.comment, color_base },
+    .{ tree_sitter.TSTokenType.identifier, color_catppuccin.text },
+    .{ tree_sitter.TSTokenType.integer, color_catppuccin.peach },
+    .{ tree_sitter.TSTokenType.operator, color_catppuccin.teal },
+    .{ tree_sitter.TSTokenType.string, color_catppuccin.green },
+    .{ tree_sitter.TSTokenType.symbol, color_base },
+    .{ tree_sitter.TSTokenType.struct_keyword, color_catppuccin.mauve },
+    .{ tree_sitter.TSTokenType.macro, color_catppuccin.yellow },
+    .{ tree_sitter.TSTokenType.var_keyword, color_catppuccin.mauve },
+    .{ tree_sitter.TSTokenType.function, color_catppuccin.mauve },
 };
 
-fn getToken(kind: []const u8) TSTokenType {
-    for (kind_to_token_map) |tup| {
-        if (std.mem.eql(u8, kind, tup[0])) {
-            return tup[1];
-        }
-    }
-
-    return TSTokenType.none;
-}
-
-fn getTokenColor(token: TSTokenType) [3]u8 {
+fn getTokenColor(token: tree_sitter.TSTokenType) [3]u8 {
     for (token_to_color_map) |tup| {
         if (tup[0] == token) {
             return tup[1];
@@ -132,7 +70,7 @@ fn getTokenColor(token: TSTokenType) [3]u8 {
     return color_base;
 }
 
-pub fn getStyle(kind: []const u8, is_line_selected: bool, is_cursor: bool) vaxis.Style {
+pub fn getStyle(kind: tree_sitter.TSTokenType, is_line_selected: bool, is_cursor: bool) vaxis.Style {
     var style = theme_line;
     if (is_line_selected) {
         style = theme_line_selected;
@@ -142,20 +80,18 @@ pub fn getStyle(kind: []const u8, is_line_selected: bool, is_cursor: bool) vaxis
         }
     }
 
-    const token = getToken(kind);
-
     // debug so we can find out which token is missing
-    if (token == TSTokenType.none) {
-        debug.add(kind) catch |err| {
+    if (kind == tree_sitter.TSTokenType.none) {
+        debug.add(@tagName(kind)) catch |err| {
             std.debug.print("error: {}\n", .{err});
         };
     }
 
-    if (token == TSTokenType.comment) {
+    if (kind == tree_sitter.TSTokenType.comment) {
         style.dim = true;
     }
 
-    style.fg = .{ .rgb = getTokenColor(token) };
+    style.fg = .{ .rgb = getTokenColor(kind) };
 
     return style;
 }

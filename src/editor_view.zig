@@ -1,6 +1,7 @@
 const std = @import("std");
 const vaxis = @import("vaxis");
 const grapheme = @import("grapheme");
+const tree_sitter = @import("./tree_sitter.zig");
 const Buffer = @import("./buffer.zig");
 const theme = @import("./theme.zig");
 const debug = @import("./debug.zig");
@@ -53,11 +54,6 @@ pub fn init(alloc: std.mem.Allocator, buffer: *Buffer) !*EditorView {
 
 pub fn deinit(self: *EditorView) void {
     self.buffer.deinit();
-}
-
-pub fn update(self: *EditorView) void {
-    _ = self;
-    // NOTE: nothing to do for now...
 }
 
 fn renderFillLine(
@@ -170,6 +166,18 @@ fn renderLineNumber(
     return curr_pos;
 }
 
+pub fn update(self: *EditorView) void {
+    _ = self;
+    // TODO: should have something like... "has been modified"
+    //       no point in making calculations without modifications
+    //       dont forget, changing cursor can be considered a modification
+    //       either that or we compute the whole file onc
+    //       maybe cached struct should have a "should render"
+    // TODO: calculate each character that can be renderer and cache
+    //       the style
+    // NOTE: nothing to do for now...
+}
+
 pub fn render(self: *EditorView, win: vaxis.Window) !void {
     // cache for usage on events
     self.win_width = win.width;
@@ -188,7 +196,7 @@ pub fn render(self: *EditorView, win: vaxis.Window) !void {
     var i: usize = 0;
     var iter = grapheme.Iterator.init(data, &gd);
 
-    var last_node_kind: []const u8 = "";
+    var last_node_kind = tree_sitter.TSTokenType.none;
     var style: vaxis.Style = theme.getStyle(last_node_kind, false, false);
 
     while (iter.next()) |gc| : (i += 1) {
@@ -217,7 +225,7 @@ pub fn render(self: *EditorView, win: vaxis.Window) !void {
 
         // decide style if the node kind changed
         const node_kind = try self.buffer.highlightAt(row, col);
-        if (!std.mem.eql(u8, node_kind, "")) {
+        if (tree_sitter.TSTokenType.none != node_kind) {
             last_node_kind = node_kind;
         }
         style = theme.getStyle(last_node_kind, is_line_selected, is_cursor);

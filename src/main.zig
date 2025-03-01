@@ -9,9 +9,11 @@ const EditorView = @import("./editor_view.zig");
 const Renderer = @import("./renderer.zig");
 
 const enable_debug = true;
-const render_frame_time_ms = @divFloor(1000, 120);
+const render_frame_time_ms = @divFloor(1000, 60);
 const update_frame_time_ms = @divFloor(1000, 240);
 
+// TODO: we should be able to have multiple buffers o it is easy to jump
+//       between files
 pub const App = struct {
     buffer_allocator: std.mem.Allocator,
 

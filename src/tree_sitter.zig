@@ -10,6 +10,71 @@ extern fn tree_sitter_make() callconv(.C) *ts.Language;
 extern fn tree_sitter_toml() callconv(.C) *ts.Language;
 extern fn tree_sitter_yaml() callconv(.C) *ts.Language;
 
+pub const TSTokenType = enum {
+    none, // means it hasn't found one
+
+    comment,
+    identifier,
+    integer,
+    operator, // +, -, /, *, =
+    string,
+    symbol, // ;, ,, :, (, ), {, }
+
+    struct_keyword,
+    var_keyword, // const, var, let...
+    macro,
+    function, // function, fn, fun
+};
+const kind_to_token_map: [34]std.meta.Tuple(&.{
+    []const u8,
+    TSTokenType,
+}) = .{
+    .{ "comment", TSTokenType.comment },
+    .{ "identifier", TSTokenType.identifier },
+    .{ "property_identifier", TSTokenType.identifier },
+    .{ "shorthand_property_identifier_pattern", TSTokenType.identifier },
+    .{ "number", TSTokenType.integer },
+    .{ "integer", TSTokenType.integer },
+    .{ "+", TSTokenType.operator },
+    .{ "-", TSTokenType.operator },
+    .{ "/", TSTokenType.operator },
+    .{ "*", TSTokenType.operator },
+    .{ "=", TSTokenType.operator },
+    .{ "string", TSTokenType.string },
+    .{ "template_string", TSTokenType.string },
+    .{ ";", TSTokenType.symbol },
+    .{ ",", TSTokenType.symbol },
+    .{ ":", TSTokenType.symbol },
+    .{ ".", TSTokenType.symbol },
+    .{ "(", TSTokenType.symbol },
+    .{ ")", TSTokenType.symbol },
+    .{ "{", TSTokenType.symbol },
+    .{ "}", TSTokenType.symbol },
+    .{ "[", TSTokenType.symbol },
+    .{ "]", TSTokenType.symbol },
+    .{ "struct", TSTokenType.struct_keyword },
+    .{ "enum", TSTokenType.struct_keyword },
+    .{ "macro", TSTokenType.macro },
+    .{ "builtin_type", TSTokenType.macro },
+    .{ "builtin_identifier", TSTokenType.struct_keyword },
+    .{ "var", TSTokenType.var_keyword },
+    .{ "let", TSTokenType.var_keyword },
+    .{ "const", TSTokenType.var_keyword },
+    .{ "function", TSTokenType.function },
+    .{ "fn", TSTokenType.function },
+    .{ "fun", TSTokenType.function },
+};
+
+fn getToken(kind: []const u8) TSTokenType {
+    for (kind_to_token_map) |tup| {
+        if (std.mem.eql(u8, kind, tup[0])) {
+            return tup[1];
+        }
+    }
+
+    return TSTokenType.none;
+}
+
 fn prettyPrintSexp(allocator: std.mem.Allocator, sexp: []const u8) ![]const u8 {
     var output = std.ArrayList(u8).init(allocator);
     defer output.deinit();
@@ -138,57 +203,25 @@ pub fn getHighlightCursor(tree: ?*ts.Tree, query: ?*ts.Query) ?*ts.QueryCursor {
     return cursor;
 }
 
-pub fn highlightAt(cursor: *ts.QueryCursor, row: usize, col: usize) !?struct {
-    node: ts.Node,
-    index: u32,
-} {
+pub fn highlightAt(cursor: *ts.QueryCursor, row: usize, col: usize) !TSTokenType {
     try cursor.setPointRange(
-        // .{ .row = @intCast(row), .column = 0 },
-        // .{ .row = @intCast(row + 1), .column = 0 },
-        .{ .row = @intCast(row), .column = @intCast(col) },
-        .{ .row = @intCast(row), .column = @intCast(col +| 10) },
+        .{ .row = @intCast(row), .column = col },
+        .{ .row = @intCast(row), .column = col +| 10 },
     );
 
-    // find the query match relevant
-    // NOTE: since we already set the point range, it should be the next one
+    var token = TSTokenType.none;
+
     while (cursor.nextMatch()) |match| {
         for (match.captures) |capture| {
-            // const range = capture.node.range();
-            // const start = range.start_point;
-            // const end = range.end_point;
+            const range = capture.node.range();
+            const start = range.start_point;
+            const end = range.end_point;
             // const scope = query.captureNameForId(capture.id);
-            // if (start.row == row and start.column <= col and col < end.column) {
-            // if (start.row == row and start.column == col) {
-            // for debugging purposes...
-            // try saveNodeToFile(capture.node, "./tmp_highlight_at");
-
-            return .{
-                .index = capture.index,
-                .node = capture.node,
-            };
-            // }
+            if (start.row == row and start.column <= col and col < end.column) {
+                token = getToken(capture.node.kind());
+            }
         }
     }
 
-    return null;
-}
-
-pub fn highlightAtByte(cursor: *ts.QueryCursor, start_byte: u32, end_byte: u32) !?struct {
-    node: ts.Node,
-    index: u32,
-} {
-    try cursor.setByteRange(start_byte, end_byte);
-
-    // find the query match relevant
-    // NOTE: since we already set the point range, it should be the next one
-    while (cursor.nextMatch()) |match| {
-        for (match.captures) |capture| {
-            return .{
-                .index = capture.index,
-                .node = capture.node,
-            };
-        }
-    }
-
-    return null;
+    return token;
 }

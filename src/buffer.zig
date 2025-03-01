@@ -14,6 +14,7 @@ data: ?[]u8,
 ts_tree: ?*ts.Tree,
 ts_grammar: ?*ts.Language,
 ts_highlight_query: ?*ts.Query,
+ts_highlight_cursor: ?*ts.QueryCursor,
 
 pub fn init(alloc: std.mem.Allocator) !*Buffer {
     const buffer = try alloc.create(Buffer);
@@ -27,12 +28,16 @@ pub fn init(alloc: std.mem.Allocator) !*Buffer {
         .ts_tree = null,
         .ts_grammar = null,
         .ts_highlight_query = null,
+        .ts_highlight_cursor = null,
     };
 
     return buffer;
 }
 
 pub fn deinit(self: *Buffer) void {
+    if (self.ts_highlight_cursor) |cursor| {
+        cursor.destroy();
+    }
     if (self.ts_highlight_query) |query| {
         query.destroy();
     }
@@ -71,6 +76,7 @@ pub fn update(self: *Buffer) !void {
         self.ts_tree = null;
         self.ts_grammar = null;
         self.ts_highlight_query = null;
+        self.ts_highlight_cursor = null;
         return;
     }
 
@@ -80,30 +86,37 @@ pub fn update(self: *Buffer) !void {
         self.ts_tree = tree.tree;
         self.ts_grammar = tree.grammar;
         self.ts_highlight_query = tree.highlight_query;
+        self.ts_highlight_cursor = null;
     } else {
         self.ts_tree = null;
         self.ts_grammar = null;
         self.ts_highlight_query = null;
+        self.ts_highlight_cursor = null;
     }
 }
 
-pub fn highlightAt(self: *Buffer, row: usize, col: usize) ![]const u8 {
+pub fn highlightAt(self: *Buffer, row: usize, col: usize) !tree_sitter.TSTokenType {
     // TODO: we are redoing this over and over, there must be a better way
     //       can't we just reset the highlight cursor?!
-    const ts_highlight_cursor_raw = tree_sitter.getHighlightCursor(
+    //       tried already to only run it once but for some reason
+    //       the buffer is not resetting. need to figure why
+    if (self.ts_highlight_cursor) |cursor| {
+        cursor.destroy();
+    }
+
+    self.ts_highlight_cursor = tree_sitter.getHighlightCursor(
         self.ts_tree,
         self.ts_highlight_query,
     );
 
-    if (ts_highlight_cursor_raw) |cursor| {
-        defer cursor.destroy();
-        const res = try tree_sitter.highlightAt(cursor, row, col);
-        if (res) |result| {
-            return result.node.kind();
-        }
+    // TODO: if we can't reset the cursor, maybe we can redo the highlight
+    //       one per update
+
+    if (self.ts_highlight_cursor) |cursor| {
+        return try tree_sitter.highlightAt(cursor, row, col);
     }
 
-    return "";
+    return tree_sitter.TSTokenType.none;
 }
 
 test "read" {
