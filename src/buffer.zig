@@ -12,9 +12,7 @@ data: ?[]u8,
 
 // treesitter specific
 ts_tree: ?*ts.Tree,
-ts_grammar: ?*ts.Language,
-ts_highlight_query: ?*ts.Query,
-ts_highlight_cursor: ?*ts.QueryCursor,
+ts_highlight_matches: ?std.ArrayList(tree_sitter.MatchCapture),
 
 pub fn init(alloc: std.mem.Allocator) !*Buffer {
     const buffer = try alloc.create(Buffer);
@@ -26,23 +24,15 @@ pub fn init(alloc: std.mem.Allocator) !*Buffer {
 
         // treesitter specific
         .ts_tree = null,
-        .ts_grammar = null,
-        .ts_highlight_query = null,
-        .ts_highlight_cursor = null,
+        .ts_highlight_matches = null,
     };
 
     return buffer;
 }
 
 pub fn deinit(self: *Buffer) void {
-    if (self.ts_highlight_cursor) |cursor| {
-        cursor.destroy();
-    }
-    if (self.ts_highlight_query) |query| {
-        query.destroy();
-    }
-    if (self.ts_grammar) |grammar| {
-        grammar.destroy();
+    if (self.ts_highlight_matches) |matches| {
+        matches.deinit();
     }
     if (self.ts_tree) |tree| {
         tree.destroy();
@@ -69,14 +59,11 @@ pub fn read(self: *Buffer, file_path: []u8) !void {
 }
 
 pub fn update(self: *Buffer) !void {
+    self.ts_tree = null;
+    self.ts_highlight_matches = null;
+
     if (self.file_path == null or self.data == null) {
         self.syntax = null;
-
-        // treesitter specific
-        self.ts_tree = null;
-        self.ts_grammar = null;
-        self.ts_highlight_query = null;
-        self.ts_highlight_cursor = null;
         return;
     }
 
@@ -84,39 +71,41 @@ pub fn update(self: *Buffer) !void {
     if (self.syntax) |syntax| {
         const tree = try tree_sitter.parseCode(self.data.?, syntax);
         self.ts_tree = tree.tree;
-        self.ts_grammar = tree.grammar;
-        self.ts_highlight_query = tree.highlight_query;
-        self.ts_highlight_cursor = null;
-    } else {
-        self.ts_tree = null;
-        self.ts_grammar = null;
-        self.ts_highlight_query = null;
-        self.ts_highlight_cursor = null;
+
+        const cursor_raw = tree_sitter.getHighlightCursor(tree.tree, tree.highlight_query);
+        if (cursor_raw) |cursor| {
+            defer cursor.destroy();
+
+            self.ts_highlight_matches = try tree_sitter.highlightMatches(
+                self.allocator,
+                cursor,
+                0,
+                std.math.maxInt(u16),
+            );
+        }
     }
 }
 
 pub fn highlightAt(self: *Buffer, row: usize, col: usize) !tree_sitter.TSTokenType {
-    // TODO: we are redoing this over and over, there must be a better way
-    //       can't we just reset the highlight cursor?!
-    //       tried already to only run it once but for some reason
-    //       the buffer is not resetting. need to figure why
-    if (self.ts_highlight_cursor) |cursor| {
-        cursor.destroy();
+    var token = tree_sitter.TSTokenType.none;
+
+    if (self.ts_highlight_matches) |matches| {
+        for (matches.items) |match| {
+            // row is not part of the match
+            if (row < match.start_y or row > match.end_y) {
+                continue;
+            }
+
+            // col is not part of the match
+            if (col < match.start_x or col > match.end_x) {
+                continue;
+            }
+
+            token = match.token;
+        }
     }
 
-    self.ts_highlight_cursor = tree_sitter.getHighlightCursor(
-        self.ts_tree,
-        self.ts_highlight_query,
-    );
-
-    // TODO: if we can't reset the cursor, maybe we can redo the highlight
-    //       one per update
-
-    if (self.ts_highlight_cursor) |cursor| {
-        return try tree_sitter.highlightAt(cursor, row, col);
-    }
-
-    return tree_sitter.TSTokenType.none;
+    return token;
 }
 
 test "read" {

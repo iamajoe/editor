@@ -43,19 +43,22 @@ const theme_cursor: vaxis.Style = .{
     .bg = .{ .rgb = [_]u8{ 85, 85, 85 } },
 };
 
-const token_to_color_map: [11]std.meta.Tuple(&.{
+const token_to_color_map: [14]std.meta.Tuple(&.{
     tree_sitter.TSTokenType,
     [3]u8,
 }) = .{
     .{ tree_sitter.TSTokenType.none, color_base },
     .{ tree_sitter.TSTokenType.comment, color_base },
     .{ tree_sitter.TSTokenType.identifier, color_catppuccin.text },
+    .{ tree_sitter.TSTokenType.null_keyword, color_catppuccin.peach },
+    .{ tree_sitter.TSTokenType.property_identifier, color_catppuccin.peach },
     .{ tree_sitter.TSTokenType.integer, color_catppuccin.peach },
     .{ tree_sitter.TSTokenType.operator, color_catppuccin.teal },
     .{ tree_sitter.TSTokenType.string, color_catppuccin.green },
     .{ tree_sitter.TSTokenType.symbol, color_base },
-    .{ tree_sitter.TSTokenType.struct_keyword, color_catppuccin.mauve },
-    .{ tree_sitter.TSTokenType.macro, color_catppuccin.yellow },
+    .{ tree_sitter.TSTokenType.lang_keyword, color_catppuccin.mauve },
+    .{ tree_sitter.TSTokenType.builtin_type, color_catppuccin.yellow },
+    .{ tree_sitter.TSTokenType.builtin_identifier, color_catppuccin.mauve },
     .{ tree_sitter.TSTokenType.var_keyword, color_catppuccin.mauve },
     .{ tree_sitter.TSTokenType.function, color_catppuccin.mauve },
 };
