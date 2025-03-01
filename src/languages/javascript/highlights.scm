@@ -1,4 +1,7 @@
 ; REF: https://github.com/gopad-dev/gopad/blob/better-highlighting/config/queries/javascript/highlights.scm
+; REF: https://github.com/helix-editor/helix/blob/master/runtime/queries/ecma/highlights.scm
+; REF: https://github.com/tree-sitter/tree-sitter-javascript/blob/master/queries/highlights.scm
+
 ; Variables
 ;----------
 
@@ -76,9 +79,6 @@
 [
   (true)
   (false)
-] @constant.builtin.boolean
-
-[
   (null)
   (undefined)
 ] @constant.builtin
@@ -91,7 +91,7 @@
 ] @string
 
 (regex) @string.special
-(number) @constant.numeric
+(number) @number
 
 ; Tokens
 ;-------

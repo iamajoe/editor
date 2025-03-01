@@ -31,24 +31,6 @@ const color_catppuccin = struct {
     const crust = [_]u8{ 17, 17, 27 };
 };
 const color_base = [_]u8{ 162, 162, 203 };
-
-const TSTokenType = enum {
-    none, // means it hasn't found one
-
-    comment,
-    identifier,
-    number,
-    operator, // +, -, /, *, =
-    string,
-    symbol, // ;, ,, :, (, ), {, }
-
-    var_keyword, // const, var, let...
-    function, // function, fn, fun
-};
-const symbol_to_token_map: [24]std.meta.Tuple(&.{ TSTokenType, [3]u8 }) = .{
-    .{ TSTokenType.none, color_base },
-};
-
 const theme_col_gap: usize = 2;
 const theme_line: vaxis.Style = .{
     // .dim = true,
@@ -57,85 +39,97 @@ const theme_line_selected: vaxis.Style = .{
     .bg = .{ .rgb = [_]u8{ 50, 50, 50 } },
 };
 const theme_cursor: vaxis.Style = .{
-    .bg = .{ .rgb = [_]u8{ 75, 75, 75 } },
+    .bg = .{ .rgb = [_]u8{ 85, 85, 85 } },
+};
+
+const TSTokenType = enum {
+    none, // means it hasn't found one
+
+    comment,
+    identifier,
+    integer,
+    operator, // +, -, /, *, =
+    string,
+    symbol, // ;, ,, :, (, ), {, }
+
+    struct_keyword,
+    var_keyword, // const, var, let...
+    macro,
+    function, // function, fn, fun
+};
+const kind_to_token_map: [33]std.meta.Tuple(&.{
+    []const u8,
+    TSTokenType,
+}) = .{
+    .{ "comment", TSTokenType.comment },
+    .{ "identifier", TSTokenType.identifier },
+    .{ "property_identifier", TSTokenType.identifier },
+    .{ "shorthand_property_identifier_pattern", TSTokenType.identifier },
+    .{ "number", TSTokenType.integer },
+    .{ "integer", TSTokenType.integer },
+    .{ "+", TSTokenType.operator },
+    .{ "-", TSTokenType.operator },
+    .{ "/", TSTokenType.operator },
+    .{ "*", TSTokenType.operator },
+    .{ "=", TSTokenType.operator },
+    .{ "string", TSTokenType.string },
+    .{ "template_string", TSTokenType.string },
+    .{ ";", TSTokenType.symbol },
+    .{ ",", TSTokenType.symbol },
+    .{ ":", TSTokenType.symbol },
+    .{ ".", TSTokenType.symbol },
+    .{ "(", TSTokenType.symbol },
+    .{ ")", TSTokenType.symbol },
+    .{ "{", TSTokenType.symbol },
+    .{ "}", TSTokenType.symbol },
+    .{ "[", TSTokenType.symbol },
+    .{ "]", TSTokenType.symbol },
+    .{ "struct", TSTokenType.struct_keyword },
+    .{ "enum", TSTokenType.struct_keyword },
+    .{ "macro", TSTokenType.macro },
+    .{ "builtin_type", TSTokenType.macro },
+    .{ "var", TSTokenType.var_keyword },
+    .{ "let", TSTokenType.var_keyword },
+    .{ "const", TSTokenType.var_keyword },
+    .{ "function", TSTokenType.function },
+    .{ "fn", TSTokenType.function },
+    .{ "fun", TSTokenType.function },
+};
+const token_to_color_map: [11]std.meta.Tuple(&.{
+    TSTokenType,
+    [3]u8,
+}) = .{
+    .{ TSTokenType.none, color_base },
+    .{ TSTokenType.comment, color_base },
+    .{ TSTokenType.identifier, color_catppuccin.text },
+    .{ TSTokenType.integer, color_catppuccin.peach },
+    .{ TSTokenType.operator, color_catppuccin.teal },
+    .{ TSTokenType.string, color_catppuccin.green },
+    .{ TSTokenType.symbol, color_base },
+    .{ TSTokenType.struct_keyword, color_catppuccin.mauve },
+    .{ TSTokenType.macro, color_catppuccin.yellow },
+    .{ TSTokenType.var_keyword, color_catppuccin.mauve },
+    .{ TSTokenType.function, color_catppuccin.mauve },
 };
 
 fn getToken(kind: []const u8) TSTokenType {
-    if (std.mem.eql(u8, kind, "comment")) {
-        return TSTokenType.comment;
-    }
-
-    if (std.mem.eql(u8, kind, "identifier") or std.mem.eql(u8, kind, "property_identifier") or std.mem.eql(u8, kind, "shorthand_property_identifier_pattern")) {
-        return TSTokenType.identifier;
-    }
-
-    if (std.mem.eql(u8, kind, "number")) {
-        return TSTokenType.number;
-    }
-
-    if (std.mem.eql(u8, kind, "+") or std.mem.eql(u8, kind, "-") or std.mem.eql(u8, kind, "/") or std.mem.eql(u8, kind, "*") or std.mem.eql(u8, kind, "=")) {
-        return TSTokenType.operator;
-    }
-
-    if (std.mem.eql(u8, kind, "string") or std.mem.eql(u8, kind, "template_string")) {
-        return TSTokenType.string;
-    }
-
-    if (std.mem.eql(u8, kind, ";") or std.mem.eql(u8, kind, ",") or std.mem.eql(u8, kind, ":") or std.mem.eql(u8, kind, ".") or std.mem.eql(u8, kind, "=")) {
-        return TSTokenType.symbol;
-    }
-
-    if (std.mem.eql(u8, kind, "(") or std.mem.eql(u8, kind, ")") or std.mem.eql(u8, kind, "{") or std.mem.eql(u8, kind, "}") or std.mem.eql(u8, kind, "[") or std.mem.eql(u8, kind, "]")) {
-        return TSTokenType.symbol;
-    }
-
-    if (std.mem.eql(u8, kind, "var") or std.mem.eql(u8, kind, "const") or std.mem.eql(u8, kind, "let")) {
-        return TSTokenType.var_keyword;
-    }
-
-    if (std.mem.eql(u8, kind, "function") or std.mem.eql(u8, kind, "fn") or std.mem.eql(u8, kind, "fun")) {
-        return TSTokenType.function;
+    for (kind_to_token_map) |tup| {
+        if (std.mem.eql(u8, kind, tup[0])) {
+            return tup[1];
+        }
     }
 
     return TSTokenType.none;
 }
 
 fn getTokenColor(token: TSTokenType) [3]u8 {
-    var color = color_base;
-
-    switch (token) {
-        TSTokenType.comment => {
-            color = color_base;
-        },
-        TSTokenType.identifier => {
-            color = color_catppuccin.text;
-        },
-        TSTokenType.number => {
-            color = color_catppuccin.maroon;
-        },
-        TSTokenType.operator => {
-            color = color_catppuccin.teal;
-        },
-        TSTokenType.string => {
-            color = color_catppuccin.green;
-        },
-        TSTokenType.symbol => {
-            color = color_base;
-        },
-
-        TSTokenType.var_keyword => {
-            color = color_catppuccin.mauve;
-        },
-        TSTokenType.function => {
-            color = color_catppuccin.mauve;
-        },
-
-        else => {
-            // do nothing...
-        },
+    for (token_to_color_map) |tup| {
+        if (tup[0] == token) {
+            return tup[1];
+        }
     }
 
-    return color;
+    return color_base;
 }
 
 pub fn getStyle(kind: []const u8, is_line_selected: bool, is_cursor: bool) vaxis.Style {

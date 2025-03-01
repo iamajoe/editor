@@ -1,14 +1,14 @@
 const std = @import("std");
 const ts = @import("tree-sitter");
-const javascript = @import("./languages/javascript/main.zig");
-const markdown = @import("./languages/markdown/main.zig");
+const ts_javascript = @import("./languages/javascript/main.zig");
+const ts_zig = @import("./languages/zig/main.zig");
+const ts_markdown = @import("./languages/markdown/main.zig");
 const debug = @import("./debug.zig");
 
 extern fn tree_sitter_csv() callconv(.C) *ts.Language;
 extern fn tree_sitter_make() callconv(.C) *ts.Language;
 extern fn tree_sitter_toml() callconv(.C) *ts.Language;
 extern fn tree_sitter_yaml() callconv(.C) *ts.Language;
-extern fn tree_sitter_zig() callconv(.C) *ts.Language;
 
 fn prettyPrintSexp(allocator: std.mem.Allocator, sexp: []const u8) ![]const u8 {
     var output = std.ArrayList(u8).init(allocator);
@@ -67,20 +67,21 @@ fn getSyntaxData(syntax: []u8) struct {
 
     // figure the grammar and highlights query
     if (std.mem.eql(u8, syntax, ".js") or std.mem.eql(u8, syntax, "javascript") or std.mem.eql(u8, syntax, "js")) {
-        grammar_raw = javascript.grammar();
-        highlight_query_raw = javascript.highlight_query;
+        grammar_raw = ts_javascript.grammar();
+        highlight_query_raw = ts_javascript.highlight_query;
     } else if (std.mem.eql(u8, syntax, ".csv") or std.mem.eql(u8, syntax, "csv")) {
         grammar_raw = tree_sitter_csv();
     } else if (std.mem.eql(u8, syntax, "Makefile") or std.mem.eql(u8, syntax, "make")) {
         grammar_raw = tree_sitter_make();
     } else if (std.mem.eql(u8, syntax, ".md") or std.mem.eql(u8, syntax, "markdown")) {
-        grammar_raw = markdown.grammar();
+        grammar_raw = ts_markdown.grammar();
     } else if (std.mem.eql(u8, syntax, ".toml") or std.mem.eql(u8, syntax, "toml")) {
         grammar_raw = tree_sitter_toml();
     } else if (std.mem.eql(u8, syntax, ".yaml") or std.mem.eql(u8, syntax, ".yml") or std.mem.eql(u8, syntax, "yaml")) {
         grammar_raw = tree_sitter_yaml();
     } else if (std.mem.eql(u8, syntax, ".zig") or std.mem.eql(u8, syntax, "zig")) {
-        grammar_raw = tree_sitter_zig();
+        grammar_raw = ts_zig.grammar();
+        highlight_query_raw = ts_zig.highlight_query;
     }
 
     return .{
