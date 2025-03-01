@@ -43,6 +43,10 @@
             .url = "https://github.com/tree-sitter-grammars/tree-sitter-csv/archive/refs/tags/v1.2.0.tar.gz",
             .hash = "1220657df80b790449dfb706db589153ddfbc2c9b753827d3da88bd7d1e8e3270c31",
         },
+        .zg = .{
+            .url = "https://codeberg.org/atman/zg/archive/v0.13.4.tar.gz",
+            .hash = "1220fe42e39fd141c84fd7d5cf69945309bb47253033e68788f99bdfe5585fbc711a",
+        },
     },
     .paths = .{
         "build.zig",

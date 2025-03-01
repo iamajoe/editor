@@ -16,6 +16,9 @@ pub fn build(b: *std.Build) void {
     const vaxis = b.dependency("vaxis", .{ .target = target, .optimize = optimize });
     exe.root_module.addImport("vaxis", vaxis.module("vaxis"));
 
+    const zg = b.dependency("zg", .{ .target = target, .optimize = optimize });
+    exe.root_module.addImport("grapheme", zg.module("grapheme"));
+
     const tree_sitter = b.dependency("tree-sitter", .{ .target = target, .optimize = optimize });
     exe.root_module.addImport("tree-sitter", tree_sitter.module("tree-sitter"));
 

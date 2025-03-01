@@ -3,12 +3,14 @@ const vaxis = @import("vaxis");
 const vfxw = @import("vaxis/vxfw");
 const Buffer = @import("./buffer.zig");
 const keymanager = @import("./keymanager.zig");
+const debug = @import("./debug.zig");
 const welcome_view = @import("./welcome_view.zig");
 const EditorView = @import("./editor_view.zig");
 const Renderer = @import("./renderer.zig");
 
-const render_frame_time_ms = @divFloor(1000, 60);
-const update_frame_time_ms = @divFloor(1000, 120);
+const enable_debug = true;
+const render_frame_time_ms = @divFloor(1000, 120);
+const update_frame_time_ms = @divFloor(1000, 240);
 
 pub const App = struct {
     buffer_allocator: std.mem.Allocator,
@@ -20,6 +22,10 @@ pub const App = struct {
 };
 
 pub fn main() !void {
+    var debug_allocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer debug_allocator.deinit();
+    debug.init(debug_allocator.allocator(), enable_debug);
+
     // handle renderer
     var render_allocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer render_allocator.deinit();
@@ -49,7 +55,7 @@ pub fn main() !void {
     }
 
     // go through the main app loop
-    // try startLoop(&app);
+    try startLoop(&app);
 
     if (app.editor_view) |editor_view| {
         editor_view.deinit();
@@ -105,8 +111,6 @@ pub fn openFile(app: *App, file_path: []u8) !void {
     // TODO: should inform of error
     const open_file_path = try std.fs.cwd().realpathAlloc(
         alloc,
-        // "./src/fixtures/case-md.md",
-        // "./src/renderer.zig",
         file_path, // TODO: handle absolutes
     );
     const buffer = try Buffer.init(alloc);
@@ -117,6 +121,8 @@ pub fn openFile(app: *App, file_path: []u8) !void {
 }
 
 fn update(app: *App) !bool {
+    debug.clear();
+
     // handle event if we have one
     const eventFound = try app.renderer.tryEvent();
     if (eventFound) |event| {
@@ -143,11 +149,12 @@ fn render(app: *App) !bool {
     const win = app.renderer.prepareRender();
 
     if (app.editor_view) |editor_view| {
-        _ = editor_view;
-        // try editor_view.render(win);
+        try editor_view.render(win);
     } else {
         welcome_view.render(win);
     }
+
+    try debug.render(win);
 
     // render the actual screen
     try app.renderer.render();

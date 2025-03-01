@@ -2,66 +2,13 @@ const std = @import("std");
 const ts = @import("tree-sitter");
 const javascript = @import("./languages/javascript/main.zig");
 const markdown = @import("./languages/markdown/main.zig");
-
-pub const Tree = ts.Tree;
+const debug = @import("./debug.zig");
 
 extern fn tree_sitter_csv() callconv(.C) *ts.Language;
 extern fn tree_sitter_make() callconv(.C) *ts.Language;
 extern fn tree_sitter_toml() callconv(.C) *ts.Language;
 extern fn tree_sitter_yaml() callconv(.C) *ts.Language;
 extern fn tree_sitter_zig() callconv(.C) *ts.Language;
-
-fn findSyntax(syntax: []u8) *ts.Language {
-    // TODO: still need to implement these
-    // https://tree-sitter.github.io/tree-sitter/index.html
-    // - json
-    // - typescript
-    // - html
-    // - go
-    // - c
-    // - css
-
-    // TODO: would prefer to have this at comptime somehow, with anonymous fns
-    const extension_mapping: [17]std.meta.Tuple(&.{
-        []const u8,
-        *ts.Language,
-    }) = .{
-        .{ "csv", tree_sitter_csv() },
-        .{ ".csv", tree_sitter_csv() },
-
-        .{ "javascript", javascript.grammar() },
-        .{ "js", javascript.grammar() },
-        .{ ".js", javascript.grammar() },
-
-        .{ "make", tree_sitter_make() },
-        .{ "Makefile", tree_sitter_make() },
-
-        .{ "markdown", markdown.grammar() },
-        .{ ".md", markdown.grammar() },
-
-        .{ "toml", tree_sitter_toml() },
-        .{ ".toml", tree_sitter_toml() },
-
-        .{ "yaml", tree_sitter_yaml() },
-        .{ ".yaml", tree_sitter_yaml() },
-        .{ ".yml", tree_sitter_yaml() },
-
-        .{ "zig", tree_sitter_zig() },
-        .{ ".zig", tree_sitter_zig() },
-
-        .{ "default", markdown.grammar() },
-    };
-
-    for (extension_mapping) |tup| {
-        if (!std.mem.eql(u8, tup[0], syntax)) {
-            continue;
-        }
-
-        return tup[1];
-    }
-
-    return findSyntax(@constCast("default"));
-}
 
 fn prettyPrintSexp(allocator: std.mem.Allocator, sexp: []const u8) ![]const u8 {
     var output = std.ArrayList(u8).init(allocator);
@@ -97,8 +44,12 @@ fn prettyPrintSexp(allocator: std.mem.Allocator, sexp: []const u8) ![]const u8 {
     return output.toOwnedSlice();
 }
 
-fn saveTreeToFile(tree: *Tree, file_path: []const u8) !void {
-    const raw_sexp = tree.rootNode().toSexp();
+fn saveNodeToFile(node: ts.Node, file_path: []const u8) !void {
+    if (!debug.should_debug) {
+        return;
+    }
+
+    const raw_sexp = node.toSexp();
     const sexp = try prettyPrintSexp(std.heap.page_allocator, raw_sexp);
     defer std.heap.page_allocator.free(sexp);
 
@@ -107,32 +58,136 @@ fn saveTreeToFile(tree: *Tree, file_path: []const u8) !void {
     try file.writeAll(sexp);
 }
 
-pub fn parseCode(code: []u8, syntax: []u8) !*Tree {
-    // TODO: maybe we should just do a switch case with a block for the syntax language
-    //       instead of the method
-    // find the right language
-    const language = findSyntax(syntax);
-    defer language.destroy();
+fn getSyntaxData(syntax: []u8) struct {
+    grammar: ?*ts.Language,
+    highlight_query: ?[]const u8,
+} {
+    var grammar_raw: ?*ts.Language = null;
+    var highlight_query_raw: ?[]const u8 = null;
+
+    // figure the grammar and highlights query
+    if (std.mem.eql(u8, syntax, ".js") or std.mem.eql(u8, syntax, "javascript") or std.mem.eql(u8, syntax, "js")) {
+        grammar_raw = javascript.grammar();
+        highlight_query_raw = javascript.highlight_query;
+    } else if (std.mem.eql(u8, syntax, ".csv") or std.mem.eql(u8, syntax, "csv")) {
+        grammar_raw = tree_sitter_csv();
+    } else if (std.mem.eql(u8, syntax, "Makefile") or std.mem.eql(u8, syntax, "make")) {
+        grammar_raw = tree_sitter_make();
+    } else if (std.mem.eql(u8, syntax, ".md") or std.mem.eql(u8, syntax, "markdown")) {
+        grammar_raw = markdown.grammar();
+    } else if (std.mem.eql(u8, syntax, ".toml") or std.mem.eql(u8, syntax, "toml")) {
+        grammar_raw = tree_sitter_toml();
+    } else if (std.mem.eql(u8, syntax, ".yaml") or std.mem.eql(u8, syntax, ".yml") or std.mem.eql(u8, syntax, "yaml")) {
+        grammar_raw = tree_sitter_yaml();
+    } else if (std.mem.eql(u8, syntax, ".zig") or std.mem.eql(u8, syntax, "zig")) {
+        grammar_raw = tree_sitter_zig();
+    }
+
+    return .{
+        .grammar = grammar_raw,
+        .highlight_query = highlight_query_raw,
+    };
+}
+
+pub fn parseCode(code: []u8, syntax: []u8) !struct {
+    tree: ?*ts.Tree,
+    grammar: ?*ts.Language,
+    highlight_query: ?*ts.Query,
+} {
+    const language = getSyntaxData(syntax);
+    if (language.grammar == null) {
+        return .{ .tree = null, .grammar = null, .highlight_query = null };
+    }
+
+    const grammar = language.grammar.?;
 
     // set the parser
     const parser = ts.Parser.create();
     defer parser.destroy();
-    try parser.setLanguage(language);
+    try parser.setLanguage(grammar);
 
     // build the tree
     const tree = parser.parseStringEncoding(code, null, .UTF_8) orelse unreachable;
     // TODO: what now?
 
-    // for debugging purposes...
-    try saveTreeToFile(tree, "./tmp_tree");
-
-    return tree;
-}
-
-pub fn getHighlight(allocator: std.mem.Allocator, tree: *Tree, syntax: []u8) !void {
-    if (std.mem.eql(u8, syntax, ".js") or std.mem.eql(u8, syntax, "javascript")) {
-        try javascript.getHighlight(allocator, tree);
+    var highlight_query: ?*ts.Query = null;
+    if (language.highlight_query) |query| {
+        var error_offset: u32 = 0;
+        highlight_query = try ts.Query.create(grammar, query, &error_offset);
     }
 
-    // TODO: ...
+    // for debugging purposes...
+    // try saveNodeToFile(tree.rootNode(), "./tmp_tree");
+
+    return .{
+        .tree = tree,
+        .grammar = grammar,
+        .highlight_query = highlight_query,
+    };
+}
+
+pub fn getHighlightCursor(tree: ?*ts.Tree, query: ?*ts.Query) ?*ts.QueryCursor {
+    if (tree == null or query == null) {
+        return null;
+    }
+
+    const cursor = ts.QueryCursor.create();
+    cursor.exec(query.?, tree.?.rootNode());
+
+    return cursor;
+}
+
+pub fn highlightAt(cursor: *ts.QueryCursor, row: usize, col: usize) !?struct {
+    node: ts.Node,
+    index: u32,
+} {
+    try cursor.setPointRange(
+        // .{ .row = @intCast(row), .column = 0 },
+        // .{ .row = @intCast(row + 1), .column = 0 },
+        .{ .row = @intCast(row), .column = @intCast(col) },
+        .{ .row = @intCast(row), .column = @intCast(col +| 10) },
+    );
+
+    // find the query match relevant
+    // NOTE: since we already set the point range, it should be the next one
+    while (cursor.nextMatch()) |match| {
+        for (match.captures) |capture| {
+            // const range = capture.node.range();
+            // const start = range.start_point;
+            // const end = range.end_point;
+            // const scope = query.captureNameForId(capture.id);
+            // if (start.row == row and start.column <= col and col < end.column) {
+            // if (start.row == row and start.column == col) {
+            // for debugging purposes...
+            // try saveNodeToFile(capture.node, "./tmp_highlight_at");
+
+            return .{
+                .index = capture.index,
+                .node = capture.node,
+            };
+            // }
+        }
+    }
+
+    return null;
+}
+
+pub fn highlightAtByte(cursor: *ts.QueryCursor, start_byte: u32, end_byte: u32) !?struct {
+    node: ts.Node,
+    index: u32,
+} {
+    try cursor.setByteRange(start_byte, end_byte);
+
+    // find the query match relevant
+    // NOTE: since we already set the point range, it should be the next one
+    while (cursor.nextMatch()) |match| {
+        for (match.captures) |capture| {
+            return .{
+                .index = capture.index,
+                .node = capture.node,
+            };
+        }
+    }
+
+    return null;
 }
