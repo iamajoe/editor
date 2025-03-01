@@ -73,7 +73,7 @@ fn getTokenColor(token: tree_sitter.TSTokenType) [3]u8 {
     return color_base;
 }
 
-pub fn getStyle(kind: tree_sitter.TSTokenType, is_line_selected: bool, is_cursor: bool) vaxis.Style {
+pub fn getStyle(token: tree_sitter.TSTokenType, is_line_selected: bool, is_cursor: bool) vaxis.Style {
     var style = theme_line;
     if (is_line_selected) {
         style = theme_line_selected;
@@ -83,18 +83,11 @@ pub fn getStyle(kind: tree_sitter.TSTokenType, is_line_selected: bool, is_cursor
         }
     }
 
-    // debug so we can find out which token is missing
-    if (kind == tree_sitter.TSTokenType.none) {
-        debug.add(@tagName(kind)) catch |err| {
-            std.debug.print("error: {}\n", .{err});
-        };
-    }
-
-    if (kind == tree_sitter.TSTokenType.comment) {
+    if (token == tree_sitter.TSTokenType.comment) {
         style.dim = true;
     }
 
-    style.fg = .{ .rgb = getTokenColor(kind) };
+    style.fg = .{ .rgb = getTokenColor(token) };
 
     return style;
 }
