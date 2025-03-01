@@ -240,6 +240,7 @@ pub fn render(self: *EditorView, win: vaxis.Window) !void {
             });
             col += 1;
         } else {
+            style = theme.getStyle(last_node_kind, is_line_selected, false);
             _ = self.renderFillLine(win, row, col, 0, style);
             row += 1;
             col = 0;

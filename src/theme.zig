@@ -40,7 +40,8 @@ const theme_line_selected: vaxis.Style = .{
     .bg = .{ .rgb = [_]u8{ 50, 50, 50 } },
 };
 const theme_cursor: vaxis.Style = .{
-    .bg = .{ .rgb = [_]u8{ 85, 85, 85 } },
+    // .bg = .{ .rgb = [_]u8{ 85, 85, 85 } },
+    .bg = .{ .rgb = color_catppuccin.rosewater },
 };
 
 const token_to_color_map: [14]std.meta.Tuple(&.{
@@ -48,7 +49,7 @@ const token_to_color_map: [14]std.meta.Tuple(&.{
     [3]u8,
 }) = .{
     .{ tree_sitter.TSTokenType.none, color_base },
-    .{ tree_sitter.TSTokenType.comment, color_base },
+    .{ tree_sitter.TSTokenType.comment, [_]u8{ 140, 140, 191 } },
     .{ tree_sitter.TSTokenType.identifier, color_catppuccin.text },
     .{ tree_sitter.TSTokenType.null_keyword, color_catppuccin.peach },
     .{ tree_sitter.TSTokenType.property_identifier, color_catppuccin.peach },
@@ -83,9 +84,9 @@ pub fn getStyle(token: tree_sitter.TSTokenType, is_line_selected: bool, is_curso
         }
     }
 
-    if (token == tree_sitter.TSTokenType.comment) {
-        style.dim = true;
-    }
+    // if (token == tree_sitter.TSTokenType.comment) {
+    //     style.dim = true;
+    // }
 
     style.fg = .{ .rgb = getTokenColor(token) };
 
