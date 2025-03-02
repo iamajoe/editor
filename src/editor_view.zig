@@ -196,9 +196,6 @@ pub fn render(self: *EditorView, win: vaxis.Window) !void {
     var i: usize = 0;
     var iter = grapheme.Iterator.init(data, &gd);
 
-    var last_node_kind = tree_sitter.TSTokenType.none;
-    var style: vaxis.Style = theme.getStyle(last_node_kind, false, false);
-
     while (iter.next()) |gc| : (i += 1) {
         // no point in render anything outside of scope
         if (row >= win.height - 1) {
@@ -225,10 +222,7 @@ pub fn render(self: *EditorView, win: vaxis.Window) !void {
 
         // decide style if the node kind changed
         const node_kind = try self.buffer.highlightAt(row, col);
-        if (tree_sitter.TSTokenType.none != node_kind) {
-            last_node_kind = node_kind;
-        }
-        style = theme.getStyle(last_node_kind, is_line_selected, is_cursor);
+        var style = theme.getStyle(node_kind, is_line_selected, is_cursor);
 
         // ignore any new lines
         const is_newline = std.mem.eql(u8, char, "\n");
@@ -240,7 +234,7 @@ pub fn render(self: *EditorView, win: vaxis.Window) !void {
             });
             col += 1;
         } else {
-            style = theme.getStyle(last_node_kind, is_line_selected, false);
+            style = theme.getStyle(node_kind, is_line_selected, false);
             _ = self.renderFillLine(win, row, col, 0, style);
             row += 1;
             col = 0;

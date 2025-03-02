@@ -71,18 +71,13 @@ pub fn update(self: *Buffer) !void {
     if (self.syntax) |syntax| {
         const tree = try tree_sitter.parseCode(self.data.?, syntax);
         self.ts_tree = tree.tree;
-
-        const cursor_raw = tree_sitter.getHighlightCursor(tree.tree, tree.highlight_query);
-        if (cursor_raw) |cursor| {
-            defer cursor.destroy();
-
-            self.ts_highlight_matches = try tree_sitter.highlightMatches(
-                self.allocator,
-                cursor,
-                0,
-                std.math.maxInt(u16),
-            );
-        }
+        self.ts_highlight_matches = try tree_sitter.highlightMatches(
+            self.allocator,
+            tree.tree,
+            tree.highlight_query,
+            0,
+            std.math.maxInt(u16),
+        );
     }
 }
 
@@ -128,7 +123,7 @@ test "read" {
     // case 2
     open_file_path = try std.fs.cwd().realpathAlloc(
         alloc,
-        "./src/fixtures/case-md.md",
+        "./src/languages/markdown/fixture.md",
     );
     try buffer.read(open_file_path);
     // try std.testing.expectEqual(buffer.data_lines.?.items.len, 20);
@@ -138,15 +133,4 @@ test "read" {
     // );
     // try std.testing.expectEqualDeep(buffer.data_lines.?.items[12], "## Code Example");
     // try std.testing.expectEqualDeep(buffer.data_lines.?.items[19], "```");
-
-    // case 3
-    open_file_path = try std.fs.cwd().realpathAlloc(
-        alloc,
-        "./src/fixtures/tiny.txt",
-    );
-
-    try buffer.read(open_file_path);
-    // try std.testing.expectEqual(buffer.data_lines.?.items.len, 2);
-    // try std.testing.expectEqualDeep(buffer.data_lines.?.items[0], "1234");
-    // try std.testing.expectEqualDeep(buffer.data_lines.?.items[1], "567");
 }

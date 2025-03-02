@@ -32,6 +32,10 @@ const color_catppuccin = struct {
     const crust = [_]u8{ 17, 17, 27 };
 };
 const color_base = [_]u8{ 162, 162, 203 };
+const color_white = [_]u8{ 224, 224, 255 };
+const color_err = [_]u8{ 255, 0, 0 };
+const color_comment = [_]u8{ 140, 140, 191 };
+
 const theme_col_gap: usize = 2;
 const theme_line: vaxis.Style = .{
     // .dim = true,
@@ -44,24 +48,48 @@ const theme_cursor: vaxis.Style = .{
     .bg = .{ .rgb = color_catppuccin.rosewater },
 };
 
-const token_to_color_map: [14]std.meta.Tuple(&.{
+const token_to_color_map: [35]std.meta.Tuple(&.{
     tree_sitter.TSTokenType,
     [3]u8,
 }) = .{
-    .{ tree_sitter.TSTokenType.none, color_base },
-    .{ tree_sitter.TSTokenType.comment, [_]u8{ 140, 140, 191 } },
-    .{ tree_sitter.TSTokenType.identifier, color_catppuccin.text },
-    .{ tree_sitter.TSTokenType.null_keyword, color_catppuccin.peach },
-    .{ tree_sitter.TSTokenType.property_identifier, color_catppuccin.peach },
-    .{ tree_sitter.TSTokenType.integer, color_catppuccin.peach },
+    .{ tree_sitter.TSTokenType.none, color_err },
+    .{ tree_sitter.TSTokenType.comment, color_comment },
+    .{ tree_sitter.TSTokenType.spell, color_comment },
+    .{ tree_sitter.TSTokenType.comment_documentation, color_comment },
+    .{ tree_sitter.TSTokenType.type, color_catppuccin.yellow },
+    .{ tree_sitter.TSTokenType.type_builtin, color_catppuccin.yellow },
+    .{ tree_sitter.TSTokenType.keyword, color_catppuccin.mauve },
+    .{ tree_sitter.TSTokenType.keyword_import, color_catppuccin.mauve },
+    .{ tree_sitter.TSTokenType.keyword_modifier, color_catppuccin.mauve },
+    .{ tree_sitter.TSTokenType.keyword_function, color_catppuccin.mauve },
+    .{ tree_sitter.TSTokenType.keyword_return, color_catppuccin.mauve },
+    .{ tree_sitter.TSTokenType.keyword_conditional, color_catppuccin.mauve },
+    .{ tree_sitter.TSTokenType.keyword_repeat, color_catppuccin.mauve },
+    .{ tree_sitter.TSTokenType.keyword_exception, color_catppuccin.mauve },
+    .{ tree_sitter.TSTokenType.keyword_operator, color_catppuccin.mauve },
+    .{ tree_sitter.TSTokenType.keyword_type, color_catppuccin.mauve },
+    .{ tree_sitter.TSTokenType.variable, color_err },
+    .{ tree_sitter.TSTokenType.variable_member, color_err },
+    .{ tree_sitter.TSTokenType.variable_parameter, color_err },
+    // TODO: this one is doing too much!!
+    .{ tree_sitter.TSTokenType.variable_builtin, color_white },
+    // .{ tree_sitter.TSTokenType.variable_builtin, color_catppuccin.blue },
+    // .{ tree_sitter.TSTokenType.variable_builtin, color_err },
+    .{ tree_sitter.TSTokenType.constant, color_err },
+    .{ tree_sitter.TSTokenType.constant_builtin, color_err },
+    .{ tree_sitter.TSTokenType.number, color_catppuccin.maroon },
+    .{ tree_sitter.TSTokenType.boolean, color_catppuccin.maroon },
+    .{ tree_sitter.TSTokenType.character, color_catppuccin.green },
     .{ tree_sitter.TSTokenType.operator, color_catppuccin.teal },
+    .{ tree_sitter.TSTokenType.module, color_catppuccin.lavender },
     .{ tree_sitter.TSTokenType.string, color_catppuccin.green },
-    .{ tree_sitter.TSTokenType.symbol, color_base },
-    .{ tree_sitter.TSTokenType.lang_keyword, color_catppuccin.mauve },
-    .{ tree_sitter.TSTokenType.builtin_type, color_catppuccin.yellow },
-    .{ tree_sitter.TSTokenType.builtin_identifier, color_catppuccin.mauve },
-    .{ tree_sitter.TSTokenType.var_keyword, color_catppuccin.mauve },
-    .{ tree_sitter.TSTokenType.function, color_catppuccin.mauve },
+    .{ tree_sitter.TSTokenType.string_escape, color_catppuccin.green },
+    .{ tree_sitter.TSTokenType.function, color_catppuccin.yellow },
+    .{ tree_sitter.TSTokenType.function_call, color_catppuccin.yellow },
+    .{ tree_sitter.TSTokenType.function_builtin, color_catppuccin.mauve },
+    .{ tree_sitter.TSTokenType.punctuation, color_catppuccin.teal },
+    .{ tree_sitter.TSTokenType.punctuation_bracket, color_catppuccin.teal },
+    .{ tree_sitter.TSTokenType.punctuation_delimiter, color_catppuccin.teal },
 };
 
 fn getTokenColor(token: tree_sitter.TSTokenType) [3]u8 {
